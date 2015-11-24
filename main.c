@@ -11,6 +11,10 @@
 #define MAP_TILES_ACROSS (UBYTE)10
 #define MAP_TILES_DOWN (UBYTE) 10
 
+#define PLAYER_SPRITE_X_OFFSET 1U
+#define PLAYER_SPRITE_X_WIDTH 12U
+#define PLAYER_SPRITE_Y_HEIGHT 15U
+
 #define FIRST_SOLID_TILE (UBYTE)6
 
 // Banks
@@ -27,7 +31,7 @@ extern UBYTE area_0_1[];
 UBYTE playerX, playerY, playerXVel, playerYVel;
 UINT8 btns, oldBtns;
 UBYTE buffer[20];
-UBYTE temp1, temp2;
+UBYTE temp1, temp2, temp3;
 // TODO: This feels clumsy... can we re-use buffer for this?
 UBYTE hearts[] = {
 	HEART_TILE, HEART_TILE, HEART_TILE, HEART_TILE, HEART_TILE, 0U, 0U, 0U
@@ -74,16 +78,16 @@ void init_screen() NONBANKED {
 
 UBYTE test_collision(UBYTE x, UBYTE y) NONBANKED {
 	// NOTE: need to understand why x and y need to be offset like this.
-	temp1 = (10U*((y/16U) - 1)) + ((x - 8)/ 16U);
+	temp3 = (10U*((y/16U) - 1)) + ((x - 8)/ 16U);
 	
-	if (area_0_1[temp1] > FIRST_SOLID_TILE-1U) {
+	if (area_0_1[temp3] > FIRST_SOLID_TILE-1U) {
 		return 1;
 	}
 	return 0;
 }
  
 void main(void) {
-	UBYTE no, temp; // FIXME: This is painfully confusing.
+	UBYTE no;
 	 
 	playerX = 64;
 	playerY = 64;
@@ -133,23 +137,23 @@ void main(void) {
 			set_win_tiles(2U, 1U, 8U, 1U, hearts);
 		}
 		
-		temp = playerX + playerXVel;
+		temp1 = playerX + playerXVel;
 		temp2 = playerY + playerYVel;
 		// Unsigned, so 0 will wrap over to > WINDOW_X_SIZE
-		if (playerXVel != 0 && temp > (PLAYER_HEIGHT/2U) && temp < (WINDOW_X_SIZE - (PLAYER_HEIGHT/2U)) &&
+		if (playerXVel != 0 && temp1 > (PLAYER_HEIGHT/2U) && temp1 < (WINDOW_X_SIZE - (PLAYER_HEIGHT/2U)) &&
 				// This could be better... both in terms of efficiency and clarity.
-				((playerXVel == -PLAYER_MOVE_DISTANCE && !test_collision(temp+1U, temp2) && !test_collision(temp+1U, temp2+15U))|| 
-				 (playerXVel ==  PLAYER_MOVE_DISTANCE && !test_collision(temp+13U, temp2) && !test_collision(temp+13U, temp2+15U)))) {
-			playerX = temp;
+				((playerXVel == -PLAYER_MOVE_DISTANCE && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2) && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2 + PLAYER_SPRITE_Y_HEIGHT))|| 
+				 (playerXVel ==  PLAYER_MOVE_DISTANCE && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2) && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2 + PLAYER_SPRITE_Y_HEIGHT)))) {
+			playerX = temp1;
 		} else {
-			temp = playerX;
+			temp1 = playerX;
 		}
 		
 		// See above, unsigned = good!
 		if (playerYVel != 0 && temp2 > PLAYER_HEIGHT && temp2 < (WINDOW_Y_SIZE - STATUS_BAR_HEIGHT) && 
 				// See above, again.
-				((playerYVel == -PLAYER_MOVE_DISTANCE && !test_collision(temp+2U, temp2) && !test_collision(temp+13U, temp2))|| 
-				 (playerYVel ==  PLAYER_MOVE_DISTANCE && !test_collision(temp+2U, temp2+15U) && !test_collision(temp+13U, temp2+15U)))) {
+				((playerYVel == -PLAYER_MOVE_DISTANCE && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2) && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2))|| 
+				 (playerYVel ==  PLAYER_MOVE_DISTANCE && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2 + PLAYER_SPRITE_Y_HEIGHT) && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2 + PLAYER_SPRITE_Y_HEIGHT)))) {
 			playerY = temp2;
 		}
 		
