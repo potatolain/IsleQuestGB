@@ -9,7 +9,7 @@
 #define PLAYER_HEIGHT (UBYTE)16
 #define PLAYER_WIDTH (UBYTE)16
 #define MAP_TILES_ACROSS (UBYTE)10
-#define MAP_TILES_DOWN (UBYTE) 10
+#define MAP_TILES_DOWN (UBYTE) 8
 
 #define PLAYER_SPRITE_X_OFFSET 1U
 #define PLAYER_SPRITE_X_WIDTH 12U
@@ -27,8 +27,10 @@
 extern UBYTE base_tiles[]; 
 extern UBYTE base_sprites[];
 extern UBYTE area_0_1[];
+extern UBYTE area_1_1[];
  
-UBYTE playerX, playerY, playerXVel, playerYVel;
+UBYTE playerX, playerY, playerXVel, playerYVel, playerWorldPos;
+UBYTE* currentMap;
 UINT8 btns, oldBtns;
 UBYTE buffer[20];
 UBYTE temp1, temp2, temp3;
@@ -38,13 +40,20 @@ UBYTE hearts[] = {
 };
 UBYTE health;
  
-void init_screen() NONBANKED {
+void update_map() NONBANKED {
 	UBYTE n;
+	
+	// TODO: Just a tiiiiiiny bit of a hack right here. Will obviously be replaced with something better.
+	if (playerWorldPos == 0) {
+		currentMap = area_0_1;
+	} else {
+		currentMap = area_1_1;
+	}
 	
 	SWITCH_ROM_MBC1(ROM_BANK_WORLD);
 	for (n = 0U; n < MAP_TILES_DOWN; n++) {
 		for (temp1 = 0U; temp1 < MAP_TILES_ACROSS; temp1++) { // Where 10 = 160/16
-			buffer[temp1*2U] = area_0_1[n*MAP_TILES_DOWN + temp1] * 4U;
+			buffer[temp1*2U] = currentMap[n*MAP_TILES_ACROSS + temp1] * 4U;
 			buffer[temp1*2U+1U] = buffer[temp1*2U] + 2U;
 		}
 		set_bkg_tiles(0U, n*2U, 20U, 1U, buffer);
@@ -54,6 +63,12 @@ void init_screen() NONBANKED {
 		}
 		set_bkg_tiles(0U, n*2U+1U, 20U, 1U, buffer);
 	}
+}
+ 
+void init_screen() NONBANKED {
+	UBYTE n;
+	
+	update_map();
 	
 	SWITCH_ROM_MBC1(ROM_BANK_TILES);
 	set_bkg_data(0U, 200U, base_tiles);
@@ -67,8 +82,8 @@ void init_screen() NONBANKED {
 	set_sprite_data( 0, 100U, base_sprites );
 	SHOW_SPRITES;
 	 
-	move_win(0, 120);
-	set_win_tiles(2, 1, 8, 1, hearts);
+	move_win(0, 128);
+	set_win_tiles(2, 0, 8, 1, hearts);
 	SHOW_WIN;
 	 
 	for (n=0; n<4; n++) {
@@ -80,7 +95,7 @@ UBYTE test_collision(UBYTE x, UBYTE y) NONBANKED {
 	// NOTE: need to understand why x and y need to be offset like this.
 	temp3 = (10U*((y/16U) - 1)) + ((x - 8)/ 16U);
 	
-	if (area_0_1[temp3] > FIRST_SOLID_TILE-1U) {
+	if (currentMap[temp3] > FIRST_SOLID_TILE-1U) {
 		return 1;
 	}
 	return 0;
@@ -92,6 +107,7 @@ void main(void) {
 	playerX = 64;
 	playerY = 64;
 	health = 5;
+	playerWorldPos = 0;
 	 
 	disable_interrupts();
 	DISPLAY_OFF;
@@ -128,13 +144,13 @@ void main(void) {
 		if (!(oldBtns & J_B) && btns & J_B && health != (UBYTE)0) {
 			hearts[health-1U] = 0x00;
 			health--;
-			set_win_tiles(2U, 1U, 8U, 1U, hearts);
+			set_win_tiles(2U, 0U, 8U, 1U, hearts);
 		}
 		
 		if (!(oldBtns & J_A) && btns & J_A && health != (UBYTE)8) {
 			health++;
 			hearts[health-1U] = HEART_TILE;
-			set_win_tiles(2U, 1U, 8U, 1U, hearts);
+			set_win_tiles(2U, 0U, 8U, 1U, hearts);
 		}
 		
 		temp1 = playerX + playerXVel;
@@ -155,6 +171,15 @@ void main(void) {
 				((playerYVel == -PLAYER_MOVE_DISTANCE && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2) && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2))|| 
 				 (playerYVel ==  PLAYER_MOVE_DISTANCE && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2 + PLAYER_SPRITE_Y_HEIGHT) && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2 + PLAYER_SPRITE_Y_HEIGHT)))) {
 			playerY = temp2;
+			// TODO: The lack of efficiency here leaves something to be desired...
+		} else if (playerYVel != 0 && temp2 >= (WINDOW_Y_SIZE - STATUS_BAR_HEIGHT)) {
+			playerY = PLAYER_HEIGHT + PLAYER_MOVE_DISTANCE;
+			playerWorldPos++;
+			update_map();
+		} else if (playerYVel != 0 && temp2 <= PLAYER_HEIGHT) {
+			playerY = (WINDOW_Y_SIZE - STATUS_BAR_HEIGHT) - PLAYER_MOVE_DISTANCE;
+			playerWorldPos--;
+			update_map();
 		}
 		
 		for (no=0U; no<4U; no++) {
