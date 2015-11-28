@@ -1,15 +1,18 @@
 #include <gb/gb.h>
 #include <gb/drawing.h>
+// TODO: This thing needs a header file soon...
 
 #define PLAYER_MOVE_DISTANCE 2
 
 #define WINDOW_X_SIZE (UBYTE)160
 #define WINDOW_Y_SIZE (UBYTE)144
 #define STATUS_BAR_HEIGHT (UBYTE)20
-#define PLAYER_HEIGHT (UBYTE)16
-#define PLAYER_WIDTH (UBYTE)16
-#define MAP_TILES_ACROSS (UBYTE)10
-#define MAP_TILES_DOWN (UBYTE) 8
+#define PLAYER_HEIGHT (UBYTE)16U
+#define PLAYER_WIDTH (UBYTE)16U
+#define MAP_TILES_ACROSS (UBYTE)10U
+#define MAP_TILES_DOWN (UBYTE) 8U
+#define MAP_TILE_ROW_WIDTH 100U
+#define MAP_TILE_ROW_HEIGHT 8U 
 
 #define PLAYER_SPRITE_X_OFFSET 1U
 #define PLAYER_SPRITE_X_WIDTH 12U
@@ -26,34 +29,34 @@
 
 extern UBYTE base_tiles[]; 
 extern UBYTE base_sprites[];
-extern UBYTE area_0_1[];
-extern UBYTE area_1_1[];
+extern UBYTE world_0[];
  
 UBYTE playerX, playerY, playerXVel, playerYVel, playerWorldPos;
 UBYTE* currentMap;
 UINT8 btns, oldBtns;
 UBYTE buffer[20];
 UBYTE temp1, temp2, temp3;
+UINT16 temp16;
 // TODO: This feels clumsy... can we re-use buffer for this?
 UBYTE hearts[] = {
 	HEART_TILE, HEART_TILE, HEART_TILE, HEART_TILE, HEART_TILE, 0U, 0U, 0U
 };
 UBYTE health;
  
+INT16 get_map_tile_base_position() {
+	return ((playerWorldPos / 10U) * (MAP_TILE_ROW_WIDTH*MAP_TILE_ROW_HEIGHT)) + ((playerWorldPos % 10U) * MAP_TILES_ACROSS);
+}
+ 
 void update_map() NONBANKED {
 	UBYTE n;
 	
-	// TODO: Just a tiiiiiiny bit of a hack right here. Will obviously be replaced with something better.
-	if (playerWorldPos == 0) {
-		currentMap = area_0_1;
-	} else {
-		currentMap = area_1_1;
-	}
+	currentMap = world_0;
 	
 	SWITCH_ROM_MBC1(ROM_BANK_WORLD);
+	temp16 = get_map_tile_base_position();
 	for (n = 0U; n < MAP_TILES_DOWN; n++) {
 		for (temp1 = 0U; temp1 < MAP_TILES_ACROSS; temp1++) { // Where 10 = 160/16
-			buffer[temp1*2U] = currentMap[n*MAP_TILES_ACROSS + temp1] * 4U;
+			buffer[temp1*2U] = currentMap[temp16 + temp1] * 4U;
 			buffer[temp1*2U+1U] = buffer[temp1*2U] + 2U;
 		}
 		set_bkg_tiles(0U, n*2U, 20U, 1U, buffer);
@@ -62,6 +65,7 @@ void update_map() NONBANKED {
 			buffer[temp1]++;
 		}
 		set_bkg_tiles(0U, n*2U+1U, 20U, 1U, buffer);
+		temp16 += MAP_TILE_ROW_WIDTH; // Position of the first tile in this row
 	}
 }
  
@@ -93,9 +97,8 @@ void init_screen() NONBANKED {
 
 UBYTE test_collision(UBYTE x, UBYTE y) NONBANKED {
 	// NOTE: need to understand why x and y need to be offset like this.
-	temp3 = (10U*((y/16U) - 1)) + ((x - 8)/ 16U);
-	
-	if (currentMap[temp3] > FIRST_SOLID_TILE-1U) {
+	temp16 = get_map_tile_base_position() + (MAP_TILE_ROW_WIDTH * (((UINT16)y/16U) - 1U)) + (((UINT16)x - 8U)/ 16U);
+	if (currentMap[temp16] > FIRST_SOLID_TILE-1U) {
 		return 1;
 	}
 	return 0;
@@ -155,31 +158,41 @@ void main(void) {
 		
 		temp1 = playerX + playerXVel;
 		temp2 = playerY + playerYVel;
-		// Unsigned, so 0 will wrap over to > WINDOW_X_SIZE
-		if (playerXVel != 0 && temp1 > (PLAYER_HEIGHT/2U) && temp1 < (WINDOW_X_SIZE - (PLAYER_HEIGHT/2U)) &&
-				// This could be better... both in terms of efficiency and clarity.
-				((playerXVel == -PLAYER_MOVE_DISTANCE && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2) && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2 + PLAYER_SPRITE_Y_HEIGHT))|| 
-				 (playerXVel ==  PLAYER_MOVE_DISTANCE && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2) && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2 + PLAYER_SPRITE_Y_HEIGHT)))) {
-			playerX = temp1;
-		} else {
-			temp1 = playerX;
+		
+		if (playerXVel != 0) {
+			// Unsigned, so 0 will wrap over to > WINDOW_X_SIZE
+			if (temp1 > (PLAYER_WIDTH/2U) && temp1 < WINDOW_X_SIZE &&
+					// This could be better... both in terms of efficiency and clarity.
+					((playerXVel == -PLAYER_MOVE_DISTANCE && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2) && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2 + PLAYER_SPRITE_Y_HEIGHT))|| 
+					 (playerXVel ==  PLAYER_MOVE_DISTANCE && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2) && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2 + PLAYER_SPRITE_Y_HEIGHT)))) {
+				playerX = temp1;
+			} else if (temp1 >= WINDOW_X_SIZE) {
+				playerX = PLAYER_WIDTH + PLAYER_MOVE_DISTANCE;
+				playerWorldPos++;
+				update_map();
+			} else if (temp1 <= PLAYER_WIDTH) {
+				playerX = WINDOW_X_SIZE - PLAYER_MOVE_DISTANCE;
+				playerWorldPos--;
+				update_map();
+			}
 		}
 		
 		// See above, unsigned = good!
-		if (playerYVel != 0 && temp2 > PLAYER_HEIGHT && temp2 < (WINDOW_Y_SIZE - STATUS_BAR_HEIGHT) && 
-				// See above, again.
-				((playerYVel == -PLAYER_MOVE_DISTANCE && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2) && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2))|| 
-				 (playerYVel ==  PLAYER_MOVE_DISTANCE && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2 + PLAYER_SPRITE_Y_HEIGHT) && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2 + PLAYER_SPRITE_Y_HEIGHT)))) {
-			playerY = temp2;
-			// TODO: The lack of efficiency here leaves something to be desired...
-		} else if (playerYVel != 0 && temp2 >= (WINDOW_Y_SIZE - STATUS_BAR_HEIGHT)) {
-			playerY = PLAYER_HEIGHT + PLAYER_MOVE_DISTANCE;
-			playerWorldPos++;
-			update_map();
-		} else if (playerYVel != 0 && temp2 <= PLAYER_HEIGHT) {
-			playerY = (WINDOW_Y_SIZE - STATUS_BAR_HEIGHT) - PLAYER_MOVE_DISTANCE;
-			playerWorldPos--;
-			update_map();
+		if (playerYVel != 0) {
+			if (temp2 > PLAYER_HEIGHT && temp2 < (WINDOW_Y_SIZE - STATUS_BAR_HEIGHT) && 
+					// See above, again.
+					((playerYVel == -PLAYER_MOVE_DISTANCE && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2) && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2))|| 
+					 (playerYVel ==  PLAYER_MOVE_DISTANCE && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2 + PLAYER_SPRITE_Y_HEIGHT) && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2 + PLAYER_SPRITE_Y_HEIGHT)))) {
+				playerY = temp2;
+			} else if (temp2 >= (WINDOW_Y_SIZE - STATUS_BAR_HEIGHT)) {
+				playerY = PLAYER_HEIGHT + PLAYER_MOVE_DISTANCE;
+				playerWorldPos += 10U;
+				update_map();
+			} else if (temp2 <= PLAYER_HEIGHT) {
+				playerY = (WINDOW_Y_SIZE - STATUS_BAR_HEIGHT) - PLAYER_MOVE_DISTANCE;
+				playerWorldPos -= 10U;
+				update_map();
+			}
 		}
 		
 		for (no=0U; no<4U; no++) {

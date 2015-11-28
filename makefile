@@ -1,5 +1,5 @@
 GRAPHICS_FILES = base_sprites base_tiles 
-TILE_FILES = area_0_1 area_1_1
+TILE_FILES = world_0
 
 ifeq ($(OS),Windows_NT)
 # Nasty little trick to get us a backslash.
@@ -35,11 +35,10 @@ all:
 	$(foreach OBJ,$(TILE_FILES),echo .globl _$(OBJ) > processed/$(OBJ).s && echo .dw _$(OBJ) >> processed/$(OBJ).s && cat graphics/$(OBJ).z80 | grep -v equ | grep -v end | sed "s/.byte/.db/g" | sed s/\$$/0x/g >> processed/$(OBJ).s${\n})
 	$(CC) -Wa-l -Wf-bo1 -c -o base_tiles.o processed/base_tiles.s
 	$(CC) -Wa-l -Wf-bo2 -c -o base_sprites.o processed/base_sprites.s
-	$(CC) -Wa-l -Wf-bo3 -c -o area_0_1.o processed/area_0_1.s
-	$(CC) -Wa-l -Wf-bo3 -c -o area_0_1.o processed/area_1_1.s
+	$(CC) -Wa-l -Wf-b03 -c -o world_0.o processed/world_0.s
 #Duplicate the map for now.
-	$(CC) -Wa-l -Wf-bo4 -c -o area_0_1b.o processed/area_0_1.s
-	$(CC) -Wl-yt1 -Wl-yo4 -o main.gb main.o area_0_1.o area_0_1b.o base_tiles.o base_sprites.o 
+	$(CC) -Wa-l -Wf-bo4 -c -o world_0.o processed/world_0.s
+	$(CC) -Wl-yt1 -Wl-yo4 -o main.gb main.o world_0.o base_tiles.o base_sprites.o 
 
 
 emu: 
