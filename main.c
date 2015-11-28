@@ -1,46 +1,6 @@
 #include <gb/gb.h>
 #include <gb/drawing.h>
-// TODO: This thing needs a header file soon...
-
-#define PLAYER_MOVE_DISTANCE 2
-
-#define WINDOW_X_SIZE (UBYTE)160
-#define WINDOW_Y_SIZE (UBYTE)144
-#define STATUS_BAR_HEIGHT (UBYTE)20
-#define PLAYER_HEIGHT (UBYTE)16U
-#define PLAYER_WIDTH (UBYTE)16U
-#define MAP_TILES_ACROSS (UBYTE)10U
-#define MAP_TILES_DOWN (UBYTE) 8U
-#define MAP_TILE_ROW_WIDTH 100U
-#define MAP_TILE_ROW_HEIGHT 8U 
-
-#define PLAYER_SPRITE_X_OFFSET 1U
-#define PLAYER_SPRITE_X_WIDTH 12U
-#define PLAYER_SPRITE_Y_HEIGHT 15U
-
-#define FIRST_SOLID_TILE (UBYTE)6
-
-// Banks
-#define ROM_BANK_TILES 1U
-#define ROM_BANK_SPRITES 2U
-#define ROM_BANK_WORLD 3U
-#define PLAYER_ANIM_INTERVAL 0x08U // %00000100
-#define PLAYER_ANIM_SHIFT 3U
-
-#define HEART_TILE (UBYTE)152
-
-enum PLAYER_DIRECTION {
-	PLAYER_DIRECTION_DOWN = 0,
-	PLAYER_DIRECTION_RIGHT = 1, 
-	PLAYER_DIRECTION_UP = 2,
-	PLAYER_DIRECTION_LEFT = 3
-} playerDirection;
-
-extern UBYTE base_tiles[]; 
-extern UBYTE base_sprites[];
-extern UBYTE world_0[];
-
-extern UINT16 sys_time;
+#include "main.h"
  
 UBYTE playerX, playerY, playerXVel, playerYVel, playerWorldPos;
 UBYTE* currentMap;
@@ -53,32 +13,6 @@ UBYTE hearts[] = {
 	HEART_TILE, HEART_TILE, HEART_TILE, HEART_TILE, HEART_TILE, 0U, 0U, 0U
 };
 UBYTE health;
- 
-INT16 get_map_tile_base_position() {
-	return ((playerWorldPos / 10U) * (MAP_TILE_ROW_WIDTH*MAP_TILE_ROW_HEIGHT)) + ((playerWorldPos % 10U) * MAP_TILES_ACROSS);
-}
- 
-void update_map() NONBANKED {
-	UBYTE n;
-	
-	currentMap = world_0;
-	
-	SWITCH_ROM_MBC1(ROM_BANK_WORLD);
-	temp16 = get_map_tile_base_position();
-	for (n = 0U; n < MAP_TILES_DOWN; n++) {
-		for (temp1 = 0U; temp1 < MAP_TILES_ACROSS; temp1++) { // Where 10 = 160/16
-			buffer[temp1*2U] = currentMap[temp16 + temp1] * 4U;
-			buffer[temp1*2U+1U] = buffer[temp1*2U] + 2U;
-		}
-		set_bkg_tiles(0U, n*2U, 20U, 1U, buffer);
-		
-		for (temp1 = 0U; temp1 < 20U; temp1++) { // Where 10 = 160/16
-			buffer[temp1]++;
-		}
-		set_bkg_tiles(0U, n*2U+1U, 20U, 1U, buffer);
-		temp16 += MAP_TILE_ROW_WIDTH; // Position of the first tile in this row
-	}
-}
  
 void init_screen() NONBANKED {
 	UBYTE n;
@@ -113,6 +47,32 @@ UBYTE test_collision(UBYTE x, UBYTE y) NONBANKED {
 		return 1;
 	}
 	return 0;
+}
+
+void update_map() NONBANKED {
+	UBYTE n;
+	
+	currentMap = world_0;
+	
+	SWITCH_ROM_MBC1(ROM_BANK_WORLD);
+	temp16 = get_map_tile_base_position();
+	for (n = 0U; n < MAP_TILES_DOWN; n++) {
+		for (temp1 = 0U; temp1 < MAP_TILES_ACROSS; temp1++) { // Where 10 = 160/16
+			buffer[temp1*2U] = currentMap[temp16 + temp1] * 4U;
+			buffer[temp1*2U+1U] = buffer[temp1*2U] + 2U;
+		}
+		set_bkg_tiles(0U, n*2U, 20U, 1U, buffer);
+		
+		for (temp1 = 0U; temp1 < 20U; temp1++) { // Where 10 = 160/16
+			buffer[temp1]++;
+		}
+		set_bkg_tiles(0U, n*2U+1U, 20U, 1U, buffer);
+		temp16 += MAP_TILE_ROW_WIDTH; // Position of the first tile in this row
+	}
+}
+
+INT16 get_map_tile_base_position() NONBANKED {
+	return ((playerWorldPos / 10U) * (MAP_TILE_ROW_WIDTH*MAP_TILE_ROW_HEIGHT)) + ((playerWorldPos % 10U) * MAP_TILES_ACROSS);
 }
 
 UBYTE animate_player() NONBANKED {
