@@ -13,7 +13,8 @@ UBYTE hearts[] = {
 	HEART_TILE, HEART_TILE, HEART_TILE, HEART_TILE, HEART_TILE, 0U, 0U, 0U
 };
 UBYTE health;
- 
+
+// Initialize the screen... set up all our tiles, sprites, etc.
 void init_screen() NONBANKED {
 	UBYTE n;
 	
@@ -34,12 +35,14 @@ void init_screen() NONBANKED {
 	move_win(0, 128);
 	set_win_tiles(2, 0, 8, 1, hearts);
 	SHOW_WIN;
-	 
+	
+	// HEY YOU MAIN CHARACTERS!!
 	for (n=0; n<4; n++) {
 		set_sprite_tile(n, n);
 	}
 }
 
+// Test the collision between the player and any solid objects (walls, etc)
 UBYTE test_collision(UBYTE x, UBYTE y) NONBANKED {
 	// NOTE: need to understand why x and y need to be offset like this.
 	temp16 = get_map_tile_base_position() + (MAP_TILE_ROW_WIDTH * (((UINT16)y/16U) - 1U)) + (((UINT16)x - 8U)/ 16U);
@@ -49,6 +52,7 @@ UBYTE test_collision(UBYTE x, UBYTE y) NONBANKED {
 	return 0;
 }
 
+// Update the map when a room change happens. (Or in other cases, I guess)
 void update_map() NONBANKED {
 	UBYTE n;
 	
@@ -56,8 +60,8 @@ void update_map() NONBANKED {
 	
 	SWITCH_ROM_MBC1(ROM_BANK_WORLD);
 	temp16 = get_map_tile_base_position();
-	for (n = 0U; n < MAP_TILES_DOWN; n++) {
-		for (temp1 = 0U; temp1 < MAP_TILES_ACROSS; temp1++) { // Where 10 = 160/16
+	for (n = 0U; n != MAP_TILES_DOWN; n++) {
+		for (temp1 = 0U; temp1 != MAP_TILES_ACROSS; temp1++) { // Where 10 = 160/16
 			buffer[temp1*2U] = currentMap[temp16 + temp1] * 4U;
 			buffer[temp1*2U+1U] = buffer[temp1*2U] + 2U;
 		}
@@ -71,10 +75,12 @@ void update_map() NONBANKED {
 	}
 }
 
+// Get the position of the top left corner of a room on the map.
 INT16 get_map_tile_base_position() NONBANKED {
 	return ((playerWorldPos / 10U) * (MAP_TILE_ROW_WIDTH*MAP_TILE_ROW_HEIGHT)) + ((playerWorldPos % 10U) * MAP_TILES_ACROSS);
 }
 
+// Animate the player's sprite based on the current system time, if they're moving.
 UBYTE animate_player() NONBANKED {
 	temp1 = 0;
 	// HACK: We know player sprites start @0, and have 3 per direction in the order of the enum.
@@ -83,16 +89,19 @@ UBYTE animate_player() NONBANKED {
 	if (playerXVel + playerYVel != 0U) {
 		temp1 += ((sys_time & PLAYER_ANIM_INTERVAL) >> PLAYER_ANIM_SHIFT) + 1U;
 	}
-	// Now, shift it left a few times (multiply it by 4) 
+	
+	// Now, shift it left a few times (multiply it by 4 to go from normal sprite to meta-sprite) 
 	temp1 = temp1 << 2U;
 	for (temp2 = 0U; temp2 != 4U; temp2++) {
 		set_sprite_tile(temp2, temp1+temp2);
 	}
 }
  
+// Here's our workhorse.
 void main(void) {
 	UBYTE no;
-	 
+	
+	// Initialize some variables
 	playerX = 64;
 	playerY = 64;
 	health = 5;
@@ -101,15 +110,17 @@ void main(void) {
 	 
 	disable_interrupts();
 	DISPLAY_OFF;
- 
+	
+	// Initialize the screen. We need our sprites and stuff!
 	init_screen();
-	 
+	
 	DISPLAY_ON;
 	enable_interrupts();
 	oldBtns = btns = 0;
-	 
+	
+	// IT BEGINS!!
 	while(1) {
-		oldBtns = btns;
+		oldBtns = btns; // Store the old state of the buttons so we can know whether this is a first press or not.
 		btns = joypad();
 		 
 		 playerXVel = playerYVel = 0;
@@ -184,10 +195,11 @@ void main(void) {
 			}
 		}
 		
-		for (no=0U; no<4U; no++) {
+		for (no=0U; no != 4U; no++) {
 			move_sprite(no, playerX + (no/2U)*8U, playerY + (no%2U)*8U);
 		}
 		
+		// Heck with it, just animate every tile.
 		animate_player();
 		
 		// I like to vblank. I like. I like to vblank. Make the game run at a sane pace.
