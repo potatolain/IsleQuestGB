@@ -24,12 +24,23 @@
 #define ROM_BANK_TILES 1U
 #define ROM_BANK_SPRITES 2U
 #define ROM_BANK_WORLD 3U
+#define PLAYER_ANIM_INTERVAL 0x08U // %00000100
+#define PLAYER_ANIM_SHIFT 3U
 
 #define HEART_TILE (UBYTE)152
+
+enum PLAYER_DIRECTION {
+	PLAYER_DIRECTION_DOWN = 0,
+	PLAYER_DIRECTION_RIGHT = 1, 
+	PLAYER_DIRECTION_UP = 2,
+	PLAYER_DIRECTION_LEFT = 3
+} playerDirection;
 
 extern UBYTE base_tiles[]; 
 extern UBYTE base_sprites[];
 extern UBYTE world_0[];
+
+extern UINT16 sys_time;
  
 UBYTE playerX, playerY, playerXVel, playerYVel, playerWorldPos;
 UBYTE* currentMap;
@@ -103,6 +114,21 @@ UBYTE test_collision(UBYTE x, UBYTE y) NONBANKED {
 	}
 	return 0;
 }
+
+UBYTE animate_player() NONBANKED {
+	temp1 = 0;
+	// HACK: We know player sprites start @0, and have 3 per direction in the order of the enum.
+	// As such, we can infer a few things based on the direction
+	temp1 = (UBYTE)playerDirection * 3U;
+	if (playerXVel + playerYVel != 0U) {
+		temp1 += ((sys_time & PLAYER_ANIM_INTERVAL) >> PLAYER_ANIM_SHIFT) + 1U;
+	}
+	// Now, shift it left a few times (multiply it by 4) 
+	temp1 = temp1 << 2U;
+	for (temp2 = 0U; temp2 != 4U; temp2++) {
+		set_sprite_tile(temp2, temp1+temp2);
+	}
+}
  
 void main(void) {
 	UBYTE no;
@@ -111,6 +137,7 @@ void main(void) {
 	playerY = 64;
 	health = 5;
 	playerWorldPos = 0;
+	playerDirection = PLAYER_DIRECTION_DOWN;
 	 
 	disable_interrupts();
 	DISPLAY_OFF;
@@ -166,6 +193,7 @@ void main(void) {
 					((playerXVel == -PLAYER_MOVE_DISTANCE && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2) && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2 + PLAYER_SPRITE_Y_HEIGHT))|| 
 					 (playerXVel ==  PLAYER_MOVE_DISTANCE && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2) && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2 + PLAYER_SPRITE_Y_HEIGHT)))) {
 				playerX = temp1;
+				playerDirection = (playerXVel == -PLAYER_MOVE_DISTANCE ? PLAYER_DIRECTION_LEFT : PLAYER_DIRECTION_RIGHT);
 			} else if (temp1 >= WINDOW_X_SIZE) {
 				playerX = PLAYER_WIDTH + PLAYER_MOVE_DISTANCE;
 				playerWorldPos++;
@@ -184,6 +212,7 @@ void main(void) {
 					((playerYVel == -PLAYER_MOVE_DISTANCE && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2) && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2))|| 
 					 (playerYVel ==  PLAYER_MOVE_DISTANCE && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2 + PLAYER_SPRITE_Y_HEIGHT) && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2 + PLAYER_SPRITE_Y_HEIGHT)))) {
 				playerY = temp2;
+				playerDirection = (playerYVel == -PLAYER_MOVE_DISTANCE ? PLAYER_DIRECTION_UP : PLAYER_DIRECTION_DOWN);
 			} else if (temp2 >= (WINDOW_Y_SIZE - STATUS_BAR_HEIGHT)) {
 				playerY = PLAYER_HEIGHT + PLAYER_MOVE_DISTANCE;
 				playerWorldPos += 10U;
@@ -198,6 +227,8 @@ void main(void) {
 		for (no=0U; no<4U; no++) {
 			move_sprite(no, playerX + (no/2U)*8U, playerY + (no%2U)*8U);
 		}
+		
+		animate_player();
 		
 		// I like to vblank. I like. I like to vblank. Make the game run at a sane pace.
 		wait_vbl_done();
