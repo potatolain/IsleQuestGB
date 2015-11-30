@@ -1,3 +1,5 @@
+#include <gb/gb.h>
+
 #define PLAYER_MOVE_DISTANCE 2
 
 #define WINDOW_X_SIZE (UBYTE)160
@@ -14,6 +16,9 @@
 #define PLAYER_SPRITE_X_WIDTH 12U
 #define PLAYER_SPRITE_Y_HEIGHT 15U
 
+#define SPRITE_X_FUDGE 8U // Fudge factor for sprites on the X axis. Need to figure out why this is needed...
+#define SPRITE_Y_FUDGE 16U
+
 #define FIRST_SOLID_TILE (UBYTE)6
 
 // Banks
@@ -22,8 +27,12 @@
 #define ROM_BANK_WORLD 3U
 #define PLAYER_ANIM_INTERVAL 0x08U // %00000100
 #define PLAYER_ANIM_SHIFT 3U
+#define SPRITE_ANIM_INTERVAL 0x32U
+#define SPRITE_ANIM_SHIFT 5U
 
 #define HEART_TILE (UBYTE)152
+
+#define WORLD_SPRITE_START 16U
 
 enum PLAYER_DIRECTION {
 	PLAYER_DIRECTION_DOWN = 0,
@@ -44,4 +53,5 @@ INT16 get_map_tile_base_position();
 void update_map();
 void init_screen();
 UBYTE test_collision(UBYTE x, UBYTE y);
-UBYTE animate_player();
+void animate_player();
+void animate_sprites();

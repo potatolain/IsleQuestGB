@@ -1,9 +1,13 @@
-#include <gb/gb.h>
-#include <gb/drawing.h>
 #include "main.h"
+#include "sprites.h"
+#include "graphics/world_0_sprites.h"
  
+#include <gb/gb.h>
+
 UBYTE playerX, playerY, playerXVel, playerYVel, playerWorldPos;
 UBYTE* currentMap;
+UBYTE* * * currentMapSprites;
+UBYTE* tempPointer;
 UINT8 btns, oldBtns;
 UBYTE buffer[20];
 UBYTE temp1, temp2, temp3;
@@ -13,14 +17,15 @@ UBYTE hearts[] = {
 	HEART_TILE, HEART_TILE, HEART_TILE, HEART_TILE, HEART_TILE, 0U, 0U, 0U
 };
 UBYTE health;
+struct SPRITE sprites[6];
 
 // Initialize the screen... set up all our tiles, sprites, etc.
 void init_screen() NONBANKED {
 	UBYTE n;
 	
+	SWITCH_ROM_MBC1(ROM_BANK_TILES);
 	update_map();
 	
-	SWITCH_ROM_MBC1(ROM_BANK_TILES);
 	set_bkg_data(0U, 200U, base_tiles);
 	set_win_data(0U, 200U, base_tiles);
 	SHOW_BKG;
@@ -29,7 +34,7 @@ void init_screen() NONBANKED {
 	OBP0_REG = 0x36U; // Set a register to tell it to use our special palette instead of the default one.
 	
 	SWITCH_ROM_MBC1(ROM_BANK_SPRITES);
-	set_sprite_data( 0, 100U, base_sprites );
+	set_sprite_data(0, 100U, base_sprites);
 	SHOW_SPRITES;
 	 
 	move_win(0, 128);
@@ -40,12 +45,13 @@ void init_screen() NONBANKED {
 	for (n=0; n<4; n++) {
 		set_sprite_tile(n, n);
 	}
+	
 }
 
 // Test the collision between the player and any solid objects (walls, etc)
 UBYTE test_collision(UBYTE x, UBYTE y) NONBANKED {
 	// NOTE: need to understand why x and y need to be offset like this.
-	temp16 = get_map_tile_base_position() + (MAP_TILE_ROW_WIDTH * (((UINT16)y/16U) - 1U)) + (((UINT16)x - 8U)/ 16U);
+	temp16 = get_map_tile_base_position() + (MAP_TILE_ROW_WIDTH * (((UINT16)y/16U) - 1U)) + (((UINT16)x - SPRITE_X_FUDGE)/ 16U);
 	if (currentMap[temp16] > FIRST_SOLID_TILE-1U) {
 		return 1;
 	}
@@ -56,9 +62,11 @@ UBYTE test_collision(UBYTE x, UBYTE y) NONBANKED {
 void update_map() NONBANKED {
 	UBYTE n;
 	
-	currentMap = world_0;
 	
 	SWITCH_ROM_MBC1(ROM_BANK_WORLD);
+	currentMap = world_0;
+	currentMapSprites = world_0_sprites;
+
 	temp16 = get_map_tile_base_position();
 	for (n = 0U; n != MAP_TILES_DOWN; n++) {
 		for (temp1 = 0U; temp1 != MAP_TILES_ACROSS; temp1++) { // Where 10 = 160/16
@@ -73,6 +81,44 @@ void update_map() NONBANKED {
 		set_bkg_tiles(0U, n*2U+1U, 20U, 1U, buffer);
 		temp16 += MAP_TILE_ROW_WIDTH; // Position of the first tile in this row
 	}
+	
+	tempPointer = currentMapSprites[playerWorldPos];
+	temp1 = 0x00; // Generic data
+	temp2 = 0; // Position
+	while(temp2 != 6U) {
+		temp1 = tempPointer++[0];
+		if (temp1 == 255U)
+			break;
+		
+		// Temp1 is our position.. convert to x/y
+		sprites[temp2].x = (temp1 % 10U) << 4U;
+		sprites[temp2].y = (temp1 / 10U) << 4U;
+
+		sprites[temp2].type = tempPointer++[0];
+		
+		sprites[temp2].data0 = tempPointer++[0];
+		// Byte 3 is unused, for now.
+		tempPointer++;
+		
+		// Apply it to some real-world sprites too!
+		for (n = 0U; n != 4U; n++) {
+			// FIXME: Monster sprites should really be variable...
+			set_sprite_tile(WORLD_SPRITE_START + (temp2 << 2U) + n, 48U + n);
+			move_sprite(WORLD_SPRITE_START + (temp2 << 2U) + n, sprites[temp2].x + ((n / 2U) << 3U) + SPRITE_X_FUDGE, sprites[temp2].y + ((n % 2U) << 3U) + SPRITE_Y_FUDGE);
+		}
+		temp2++;
+	}
+	
+	while (temp2 != 6U) {
+		// Fill in the rest -- both in actual sprites and in our structs.
+		for (n = 0U; n < 4U; n++)
+			move_sprite(WORLD_SPRITE_START + (temp2 << 2U) + n, SPRITE_OFFSCREEN_X, SPRITE_OFFSCREEN_Y);
+		
+		sprites[temp2].x = SPRITE_OFFSCREEN_X;
+		sprites[temp2].y = SPRITE_OFFSCREEN_Y;
+		temp2++;
+	}
+		
 }
 
 // Get the position of the top left corner of a room on the map.
@@ -81,7 +127,7 @@ INT16 get_map_tile_base_position() NONBANKED {
 }
 
 // Animate the player's sprite based on the current system time, if they're moving.
-UBYTE animate_player() NONBANKED {
+void animate_player() NONBANKED {
 	temp1 = 0;
 	// HACK: We know player sprites start @0, and have 3 per direction in the order of the enum.
 	// As such, we can infer a few things based on the direction
@@ -96,6 +142,18 @@ UBYTE animate_player() NONBANKED {
 		set_sprite_tile(temp2, temp1+temp2);
 	}
 }
+
+void animate_sprites() NONBANKED  {
+	// Little bit hacky... assumes all sprites have 2 states for now.
+	// TODO: This 6 is in a few places... MAX_SPRITES?
+	for (temp1 = 0; temp1 < 6; temp1++) {
+		sprites[temp1].anim_state = ((sys_time & SPRITE_ANIM_INTERVAL) >> SPRITE_ANIM_SHIFT);
+		for (temp2 = 0; temp2 < 4; temp2++) {
+			// TODO: 48? Again?
+			set_sprite_tile(WORLD_SPRITE_START + (temp1 << 2U) + temp2, 48 + (sprites[temp1].anim_state<<2) + temp2);
+		}
+	}
+}
  
 // Here's our workhorse.
 void main(void) {
@@ -107,6 +165,14 @@ void main(void) {
 	health = 5;
 	playerWorldPos = 0;
 	playerDirection = PLAYER_DIRECTION_DOWN;
+	 
+	for (no = 0; no != 6; no++) {
+		sprites[no].x = SPRITE_OFFSCREEN_X;
+		sprites[no].y = SPRITE_OFFSCREEN_Y;
+		sprites[no].type = SPRITE_TYPE_NONE;
+		sprites[no].data0 = 0U;
+		sprites[no].anim_state = 0U;
+	}
 	 
 	disable_interrupts();
 	DISPLAY_OFF;
@@ -201,6 +267,7 @@ void main(void) {
 		
 		// Heck with it, just animate every tile.
 		animate_player();
+		animate_sprites();
 		
 		// I like to vblank. I like. I like to vblank. Make the game run at a sane pace.
 		wait_vbl_done();
