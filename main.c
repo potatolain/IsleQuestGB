@@ -8,10 +8,11 @@ UBYTE playerX, playerY, playerXVel, playerYVel, playerWorldPos;
 UBYTE* currentMap;
 UBYTE* * * currentMapSprites;
 UBYTE* tempPointer;
+UBYTE playerVelocityLock;
 UINT8 btns, oldBtns;
 UBYTE buffer[20];
 UBYTE temp1, temp2, temp3;
-UINT16 temp16;
+UINT16 temp16, temp16b;
 // TODO: This feels clumsy... can we re-use buffer for this?
 UBYTE hearts[] = {
 	HEART_TILE, HEART_TILE, HEART_TILE, HEART_TILE, HEART_TILE, 0U, 0U, 0U
@@ -49,11 +50,29 @@ void init_screen() NONBANKED {
 }
 
 // Test the collision between the player and any solid objects (walls, etc)
-UBYTE test_collision(UBYTE x, UBYTE y) NONBANKED {
+UBYTE test_collision(UINT16 base, UBYTE x, UBYTE y) NONBANKED {
 	// NOTE: need to understand why x and y need to be offset like this.
-	temp16 = get_map_tile_base_position() + (MAP_TILE_ROW_WIDTH * (((UINT16)y/16U) - 1U)) + (((UINT16)x - SPRITE_X_FUDGE)/ 16U);
+	temp16 = base + (MAP_TILE_ROW_WIDTH * (((UINT16)y>>4) - 1U)) + (((UINT16)x - SPRITE_X_FUDGE)>>4);
 	if (currentMap[temp16] > FIRST_SOLID_TILE-1U) {
 		return 1;
+	}
+	return 0;
+}
+
+// Did we collide with any sprites?
+UBYTE test_sprite_collision() NONBANKED {
+	for (temp3 = 0U; temp3 < MAX_SPRITES; temp3++) {
+		if (playerX - SPRITE_X_FUDGE < sprites[temp3].x + SPRITE_WIDTH &&
+				playerX + (SPRITE_WIDTH - SPRITE_X_FUDGE) > sprites[temp3].x &&
+				playerY - SPRITE_Y_FUDGE < sprites[temp3].y + SPRITE_HEIGHT && 
+				playerY /*+ SPRITE_HEIGHT*/ > sprites[temp3].y) {// SPRITE_HEIGHT happens to equal our fudge factor (which needs to be sorted out) so... take advantage
+			
+			decrease_health();
+			playerVelocityLock = 15U;
+			playerXVel = 0U-playerXVel;
+			playerYVel = 0U-playerYVel;
+			return 1;
+		}
 	}
 	return 0;
 }
@@ -85,7 +104,7 @@ void update_map() NONBANKED {
 	tempPointer = currentMapSprites[playerWorldPos];
 	temp1 = 0x00; // Generic data
 	temp2 = 0; // Position
-	while(temp2 != 6U) {
+	while(temp2 != MAX_SPRITES) {
 		temp1 = tempPointer++[0];
 		if (temp1 == 255U)
 			break;
@@ -109,7 +128,7 @@ void update_map() NONBANKED {
 		temp2++;
 	}
 	
-	while (temp2 != 6U) {
+	while (temp2 != MAX_SPRITES) {
 		// Fill in the rest -- both in actual sprites and in our structs.
 		for (n = 0U; n < 4U; n++)
 			move_sprite(WORLD_SPRITE_START + (temp2 << 2U) + n, SPRITE_OFFSCREEN_X, SPRITE_OFFSCREEN_Y);
@@ -145,14 +164,30 @@ void animate_player() NONBANKED {
 
 void animate_sprites() NONBANKED  {
 	// Little bit hacky... assumes all sprites have 2 states for now.
-	// TODO: This 6 is in a few places... MAX_SPRITES?
-	for (temp1 = 0; temp1 < 6; temp1++) {
+	for (temp1 = 0; temp1 < MAX_SPRITES; temp1++) {
 		sprites[temp1].anim_state = ((sys_time & SPRITE_ANIM_INTERVAL) >> SPRITE_ANIM_SHIFT);
 		for (temp2 = 0; temp2 < 4; temp2++) {
 			// TODO: 48? Again?
 			set_sprite_tile(WORLD_SPRITE_START + (temp1 << 2U) + temp2, 48 + (sprites[temp1].anim_state<<2) + temp2);
 		}
 	}
+}
+
+// Decrement health by one
+void decrease_health() NONBANKED {
+	if (health == 0) return;
+	hearts[health-1U] = 0x00;
+	health--;
+	set_win_tiles(2U, 0U, 8U, 1U, hearts);
+}
+
+// Increment health by one
+void increase_health() NONBANKED {
+	if (health > 8) return;
+	health++;
+	hearts[health-1U] = HEART_TILE;
+	set_win_tiles(2U, 0U, 8U, 1U, hearts);
+
 }
  
 // Here's our workhorse.
@@ -165,8 +200,9 @@ void main(void) {
 	health = 5;
 	playerWorldPos = 0;
 	playerDirection = PLAYER_DIRECTION_DOWN;
+	playerVelocityLock = 0;
 	 
-	for (no = 0; no != 6; no++) {
+	for (no = 0; no != MAX_SPRITES; no++) {
 		sprites[no].x = SPRITE_OFFSCREEN_X;
 		sprites[no].y = SPRITE_OFFSCREEN_Y;
 		sprites[no].type = SPRITE_TYPE_NONE;
@@ -188,47 +224,51 @@ void main(void) {
 	while(1) {
 		oldBtns = btns; // Store the old state of the buttons so we can know whether this is a first press or not.
 		btns = joypad();
-		 
-		 playerXVel = playerYVel = 0;
-
-		if (btns & J_UP) {
-			playerYVel = -PLAYER_MOVE_DISTANCE;
-		}
 		
-		if (btns & J_DOWN) {
-			playerYVel = PLAYER_MOVE_DISTANCE;
-		}
-		
-		if (btns & J_LEFT) {
-			playerXVel = -PLAYER_MOVE_DISTANCE;
-		}
-		
-		if (btns & J_RIGHT) {
-			playerXVel = PLAYER_MOVE_DISTANCE;
+		if (!playerVelocityLock) {
+			playerXVel = playerYVel = 0;
+			
+			if (btns & J_UP) {
+				playerYVel = -PLAYER_MOVE_DISTANCE;
+			}
+			
+			if (btns & J_DOWN) {
+				playerYVel = PLAYER_MOVE_DISTANCE;
+			}
+			
+			if (btns & J_LEFT) {
+				playerXVel = -PLAYER_MOVE_DISTANCE;
+			}
+			
+			if (btns & J_RIGHT) {
+				playerXVel = PLAYER_MOVE_DISTANCE;
+			}
 		}
 		
 		// If this was just pressed for the very first time...
 		if (!(oldBtns & J_B) && btns & J_B && health != (UBYTE)0) {
-			hearts[health-1U] = 0x00;
-			health--;
-			set_win_tiles(2U, 0U, 8U, 1U, hearts);
+			decrease_health(1);
 		}
 		
 		if (!(oldBtns & J_A) && btns & J_A && health != (UBYTE)8) {
-			health++;
-			hearts[health-1U] = HEART_TILE;
-			set_win_tiles(2U, 0U, 8U, 1U, hearts);
+			increase_health(1);
 		}
 		
 		temp1 = playerX + playerXVel;
 		temp2 = playerY + playerYVel;
 		
+		if (!playerVelocityLock) {
+			test_sprite_collision();
+		}
+		
+		temp16b = get_map_tile_base_position();
+		
 		if (playerXVel != 0) {
 			// Unsigned, so 0 will wrap over to > WINDOW_X_SIZE
 			if (temp1 > (PLAYER_WIDTH/2U) && temp1 < WINDOW_X_SIZE &&
 					// This could be better... both in terms of efficiency and clarity.
-					((playerXVel == -PLAYER_MOVE_DISTANCE && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2) && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2 + PLAYER_SPRITE_Y_HEIGHT))|| 
-					 (playerXVel ==  PLAYER_MOVE_DISTANCE && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2) && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2 + PLAYER_SPRITE_Y_HEIGHT)))) {
+					((playerXVel == -PLAYER_MOVE_DISTANCE && !test_collision(temp16b, temp1 + PLAYER_SPRITE_X_OFFSET, temp2) && !test_collision(temp16b, temp1 + PLAYER_SPRITE_X_OFFSET, temp2 + PLAYER_SPRITE_Y_HEIGHT))|| 
+					 (playerXVel ==  PLAYER_MOVE_DISTANCE && !test_collision(temp16b, temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2) && !test_collision(temp16b, temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2 + PLAYER_SPRITE_Y_HEIGHT)))) {
 				playerX = temp1;
 				playerDirection = (playerXVel == -PLAYER_MOVE_DISTANCE ? PLAYER_DIRECTION_LEFT : PLAYER_DIRECTION_RIGHT);
 			} else if (temp1 >= WINDOW_X_SIZE) {
@@ -246,8 +286,8 @@ void main(void) {
 		if (playerYVel != 0) {
 			if (temp2 > PLAYER_HEIGHT && temp2 < (WINDOW_Y_SIZE - STATUS_BAR_HEIGHT) && 
 					// See above, again.
-					((playerYVel == -PLAYER_MOVE_DISTANCE && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2) && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2))|| 
-					 (playerYVel ==  PLAYER_MOVE_DISTANCE && !test_collision(temp1 + PLAYER_SPRITE_X_OFFSET, temp2 + PLAYER_SPRITE_Y_HEIGHT) && !test_collision(temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2 + PLAYER_SPRITE_Y_HEIGHT)))) {
+					((playerYVel == -PLAYER_MOVE_DISTANCE && !test_collision(temp16b, temp1 + PLAYER_SPRITE_X_OFFSET, temp2) && !test_collision(temp16b, temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2))|| 
+					 (playerYVel ==  PLAYER_MOVE_DISTANCE && !test_collision(temp16b, temp1 + PLAYER_SPRITE_X_OFFSET, temp2 + PLAYER_SPRITE_Y_HEIGHT) && !test_collision(temp16b, temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2 + PLAYER_SPRITE_Y_HEIGHT)))) {
 				playerY = temp2;
 				playerDirection = (playerYVel == -PLAYER_MOVE_DISTANCE ? PLAYER_DIRECTION_UP : PLAYER_DIRECTION_DOWN);
 			} else if (temp2 >= (WINDOW_Y_SIZE - STATUS_BAR_HEIGHT)) {
@@ -268,6 +308,9 @@ void main(void) {
 		// Heck with it, just animate every tile.
 		animate_player();
 		animate_sprites();
+		
+		if (playerVelocityLock)
+			playerVelocityLock--;
 		
 		// I like to vblank. I like. I like to vblank. Make the game run at a sane pace.
 		wait_vbl_done();

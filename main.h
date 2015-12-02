@@ -29,6 +29,9 @@
 #define PLAYER_ANIM_SHIFT 3U
 #define SPRITE_ANIM_INTERVAL 0x32U
 #define SPRITE_ANIM_SHIFT 5U
+#define MAX_SPRITES 6U
+#define SPRITE_HEIGHT 16U
+#define SPRITE_WIDTH 16U
 
 #define HEART_TILE (UBYTE)152
 
@@ -52,6 +55,9 @@ extern UINT16 sys_time;
 INT16 get_map_tile_base_position();
 void update_map();
 void init_screen();
-UBYTE test_collision(UBYTE x, UBYTE y);
+UBYTE test_collision(UINT16 base, UBYTE x, UBYTE y);
 void animate_player();
 void animate_sprites();
+
+void increase_health();
+void decrease_health();
