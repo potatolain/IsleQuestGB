@@ -33,7 +33,11 @@ You can get there, but there are a few additional steps.
   * 6-8: Facing up
   * 9-11: Facing right
 10. Export the sprites to graphics/base_sprites.z80 using TASM, a label of _base_sprites, From 0-16
-11. Finally, go to the base directory and type "make". 
+11. Using gbtd in the graphics/ directory, create a file named title_tiles.gbr With tiles for your game's title
+12. Export this to graphics/title_tiles.c using the setting for gbdk and a label of title_tiles
+13. Using gbmb in the graphics/ directory, create a file named title_map.gbr containing a map of your game's title.
+14. Export this to graphics/title_map.c using the setting for gbdk and a label of title_map
+19. Finally, go to the base directory and type "make". 
 
 ## Can I try it out without doing all that junk?
 
