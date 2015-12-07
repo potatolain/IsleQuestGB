@@ -2,10 +2,12 @@
 #include "sprites.h"
 #include "graphics/world_0_sprites.h"
 #include "title.h"
+#include "helper.h"
  
 #include <gb/gb.h>
 
 UBYTE playerX, playerY, playerXVel, playerYVel, playerWorldPos;
+enum PLAYER_DIRECTION playerDirection;
 UBYTE* currentMap;
 UBYTE* * * currentMapSprites;
 UBYTE* tempPointer;
@@ -146,23 +148,6 @@ INT16 get_map_tile_base_position() NONBANKED {
 	return ((playerWorldPos / 10U) * (MAP_TILE_ROW_WIDTH*MAP_TILE_ROW_HEIGHT)) + ((playerWorldPos % 10U) * MAP_TILES_ACROSS);
 }
 
-// Animate the player's sprite based on the current system time, if they're moving.
-void animate_player() NONBANKED {
-	temp1 = 0;
-	// HACK: We know player sprites start @0, and have 3 per direction in the order of the enum.
-	// As such, we can infer a few things based on the direction
-	temp1 = (UBYTE)playerDirection * 3U;
-	if (playerXVel + playerYVel != 0U) {
-		temp1 += ((sys_time & PLAYER_ANIM_INTERVAL) >> PLAYER_ANIM_SHIFT) + 1U;
-	}
-	
-	// Now, shift it left a few times (multiply it by 4 to go from normal sprite to meta-sprite) 
-	temp1 = temp1 << 2U;
-	for (temp2 = 0U; temp2 != 4U; temp2++) {
-		set_sprite_tile(temp2, temp1+temp2);
-	}
-}
-
 void animate_sprites() NONBANKED  {
 	// Little bit hacky... assumes all sprites have 2 states for now.
 	for (temp1 = 0; temp1 < MAX_SPRITES; temp1++) {
@@ -172,23 +157,6 @@ void animate_sprites() NONBANKED  {
 			set_sprite_tile(WORLD_SPRITE_START + (temp1 << 2U) + temp2, 48 + (sprites[temp1].anim_state<<2) + temp2);
 		}
 	}
-}
-
-// Decrement health by one
-void decrease_health() NONBANKED {
-	if (health == 0) return;
-	hearts[health-1U] = 0x00;
-	health--;
-	set_win_tiles(2U, 0U, 8U, 1U, hearts);
-}
-
-// Increment health by one
-void increase_health() NONBANKED {
-	if (health > 8) return;
-	health++;
-	hearts[health-1U] = HEART_TILE;
-	set_win_tiles(2U, 0U, 8U, 1U, hearts);
-
 }
  
 // Here's our workhorse.
@@ -229,43 +197,15 @@ void main(void) {
 		oldBtns = btns; // Store the old state of the buttons so we can know whether this is a first press or not.
 		btns = joypad();
 		
-		if (!playerVelocityLock) {
-			playerXVel = playerYVel = 0;
-			
-			if (btns & J_UP) {
-				playerYVel = -PLAYER_MOVE_DISTANCE;
-			}
-			
-			if (btns & J_DOWN) {
-				playerYVel = PLAYER_MOVE_DISTANCE;
-			}
-			
-			if (btns & J_LEFT) {
-				playerXVel = -PLAYER_MOVE_DISTANCE;
-			}
-			
-			if (btns & J_RIGHT) {
-				playerXVel = PLAYER_MOVE_DISTANCE;
-			}
-		}
-		
-		// If this was just pressed for the very first time...
-		if (!(oldBtns & J_B) && btns & J_B && health != (UBYTE)0) {
-			decrease_health(1);
-		}
-		
-		if (!(oldBtns & J_A) && btns & J_A && health != (UBYTE)8) {
-			increase_health(1);
-		}
-		
-		temp1 = playerX + playerXVel;
-		temp2 = playerY + playerYVel;
-		
+		SWITCH_ROM_MBC1(ROM_BANK_HELPER);
+		update_player_velocity();
+		SWITCH_ROM_MBC1(ROM_BANK_WORLD);
 		if (!playerVelocityLock) {
 			test_sprite_collision();
 		}
 		
 		temp16b = get_map_tile_base_position();
+		
 		
 		if (playerXVel != 0) {
 			// Unsigned, so 0 will wrap over to > WINDOW_X_SIZE
@@ -310,6 +250,7 @@ void main(void) {
 		}
 		
 		// Heck with it, just animate every tile.
+		SWITCH_ROM_MBC1(ROM_BANK_HELPER);
 		animate_player();
 		animate_sprites();
 		

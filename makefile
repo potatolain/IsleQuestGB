@@ -40,7 +40,8 @@ all:
 	$(CC) -Wa-l -Wf-bo4 -c -o title_map.o graphics/title_map.c
 	$(CC) -Wa-l -Wf-bo4 -c -o title_tiles.o graphics/title_tiles.c
 	$(CC) -Wa-l -Wf-bo4 -c -o title.o title.c
-	$(CC) -Wl-yt1 -Wl-yo8 -o main.gb main.o world_0.o base_tiles.o base_sprites.o world_0_sprites.o title.o title_map.o title_tiles.o
+	$(CC) -Wa-l -Wf-bo5 -c -o helper.o helper.c
+	$(CC) -Wl-yt1 -Wl-yo8 -o main.gb main.o world_0.o base_tiles.o base_sprites.o world_0_sprites.o title.o title_map.o title_tiles.o helper.o
 	
 emu: 
 	$(BGB) main.gb 

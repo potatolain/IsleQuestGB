@@ -26,6 +26,7 @@
 #define ROM_BANK_SPRITES 2U
 #define ROM_BANK_WORLD 3U
 #define ROM_BANK_TITLE 4U
+#define ROM_BANK_HELPER 5U
 #define PLAYER_ANIM_INTERVAL 0x08U // %00000100
 #define PLAYER_ANIM_SHIFT 3U
 #define SPRITE_ANIM_INTERVAL 0x32U
@@ -43,7 +44,16 @@ enum PLAYER_DIRECTION {
 	PLAYER_DIRECTION_RIGHT = 1, 
 	PLAYER_DIRECTION_UP = 2,
 	PLAYER_DIRECTION_LEFT = 3
-} playerDirection;
+};
+
+extern UBYTE temp1, temp2, temp3;
+extern UBYTE health;
+extern UBYTE hearts[];
+extern UBYTE playerXVel, playerYVel, playerVelocityLock, playerX, playerY;
+extern UBYTE btns, oldBtns;
+
+extern enum PLAYER_DIRECTION playerDirection;
+
 
 extern UBYTE base_tiles[]; 
 extern UBYTE base_sprites[];
@@ -57,8 +67,4 @@ INT16 get_map_tile_base_position();
 void update_map();
 void init_screen();
 UBYTE test_collision(UINT16 base, UBYTE x, UBYTE y);
-void animate_player();
 void animate_sprites();
-
-void increase_health();
-void decrease_health();
