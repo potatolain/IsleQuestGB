@@ -1,4 +1,4 @@
-GRAPHICS_FILES = base_sprites base_tiles 
+GRAPHICS_FILES = base_sprites base_tiles
 TILE_FILES = world_0
 
 ifeq ($(OS),Windows_NT)
@@ -37,10 +37,11 @@ all:
 	$(CC) -Wa-l -Wf-bo2 -c -o base_sprites.o processed/base_sprites.s
 	$(CC) -Wa-l -Wf-bo3 -c -o world_0.o processed/world_0.s
 	$(CC) -Wa-l -Wf-bo3 -c -o world_0_sprites.o graphics/world_0_sprites.c
-#Duplicate the map for now.
-	$(CC) -Wa-l -Wf-bo4 -c -o world_0.o processed/world_0.s
-	$(CC) -Wl-yt1 -Wl-yo4 -o main.gb main.o world_0.o base_tiles.o base_sprites.o world_0_sprites.o
-
+	$(CC) -Wa-l -Wf-bo4 -c -o title_map.o graphics/title_map.c
+	$(CC) -Wa-l -Wf-bo4 -c -o title_tiles.o graphics/title_tiles.c
+	$(CC) -Wa-l -Wf-bo4 -c -o title.o title.c
+	$(CC) -Wl-yt1 -Wl-yo8 -o main.gb main.o world_0.o base_tiles.o base_sprites.o world_0_sprites.o title.o title_map.o title_tiles.o
+	
 emu: 
 	$(BGB) main.gb 
 vba:

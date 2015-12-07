@@ -1,5 +1,6 @@
 .dropbox.attr
 graphics/base_*
+graphics/title_*
 **/*.gb
 **/*.o
 **/*.lst

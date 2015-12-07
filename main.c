@@ -1,6 +1,7 @@
 #include "main.h"
 #include "sprites.h"
 #include "graphics/world_0_sprites.h"
+#include "title.h"
  
 #include <gb/gb.h>
 
@@ -209,6 +210,9 @@ void main(void) {
 		sprites[no].data0 = 0U;
 		sprites[no].anim_state = 0U;
 	}
+	
+	SWITCH_ROM_MBC1(ROM_BANK_TITLE);
+	do_title();
 	 
 	disable_interrupts();
 	DISPLAY_OFF;
