@@ -1,5 +1,6 @@
 #include "main.h"
 #include "helper.h"
+#include "sprites.h"
 
 // Animate the player's sprite based on the current system time, if they're moving.
 void animate_player()  {
@@ -66,4 +67,21 @@ void update_player_velocity() {
 	
 	temp1 = playerX + playerXVel;
 	temp2 = playerY + playerYVel;
+}
+
+// Did we collide with any sprites?
+UBYTE test_sprite_collision() {
+	for (temp3 = 0U; temp3 < MAX_SPRITES; temp3++) {
+		if (playerX - SPRITE_X_FUDGE < sprites[temp3].x + SPRITE_WIDTH &&
+				playerX + (SPRITE_WIDTH - SPRITE_X_FUDGE) > sprites[temp3].x &&
+				playerY - SPRITE_Y_FUDGE < sprites[temp3].y + SPRITE_HEIGHT && 
+				playerY /*+ SPRITE_HEIGHT*/ > sprites[temp3].y) {// SPRITE_HEIGHT happens to equal our fudge factor (which needs to be sorted out) so... take advantage
+			decrease_health();
+			playerVelocityLock = 15U;
+			playerXVel = 0U-playerXVel;
+			playerYVel = 0U-playerYVel;
+			return 1;
+		}
+	}
+	return 0;
 }
