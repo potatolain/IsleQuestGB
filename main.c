@@ -225,9 +225,7 @@ INT16 get_map_tile_base_position() NONBANKED {
 // Here's our workhorse.
 void main(void) {
 	UBYTE no;
-	
-	initrand(sys_time);
-	
+		
 	// Initialize some variables
 	playerX = 64;
 	playerY = 64;
@@ -247,7 +245,9 @@ void main(void) {
 	
 	SWITCH_ROM_MBC1(ROM_BANK_TITLE);
 	do_title();
-	 
+	
+	initrand(sys_time);
+	
 	disable_interrupts();
 	DISPLAY_OFF;
 	
