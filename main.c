@@ -70,7 +70,6 @@ void move_sprites() NONBANKED {
 	} else {
 		temp3 = sprites[temp1].direction;
 	}
-	//temp3 = SPRITE_DIRECTION_RIGHT;
 	// Set some vars to the new x/y pos 
 	temp2 = 0U; 
 	temp4 = 0U;
@@ -257,7 +256,6 @@ void main(void) {
 	DISPLAY_ON;
 	enable_interrupts();
 	oldBtns = btns = 0;
-	temp5 = 0;
 	temp16b = get_map_tile_base_position();
 
 	// IT BEGINS!!
@@ -343,6 +341,5 @@ void main(void) {
 		// I like to vblank. I like. I like to vblank. Make the game run at a sane pace.
 		wait_vbl_done();
 		cycleCounter++;
-		//if (temp5 > 1) { return; }
 	}
 }
