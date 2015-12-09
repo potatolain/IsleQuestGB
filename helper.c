@@ -86,8 +86,12 @@ UBYTE test_sprite_collision() {
 				playerY /*+ SPRITE_HEIGHT*/ > sprites[temp3].y) {// SPRITE_HEIGHT happens to equal our fudge factor (which needs to be sorted out) so... take advantage
 			decrease_health();
 			playerVelocityLock = 15U;
-			playerXVel = 0U-playerXVel;
-			playerYVel = 0U-playerYVel;
+			if (playerXVel == 0 && playerYVel == 0) {
+				playerYVel = PLAYER_MOVE_DISTANCE;
+			} else {
+				playerXVel = 0U-playerXVel;
+				playerYVel = 0U-playerYVel;
+			}
 			return 1;
 		}
 	}
