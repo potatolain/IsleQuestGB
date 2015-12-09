@@ -1,5 +1,9 @@
 #include <gb/gb.h>
 
+#define GAME_STATE_TITLE 1
+#define GAME_STATE_RUNNING 2
+#define GAME_STATE_PAUSE 3
+
 #define PLAYER_MOVE_DISTANCE 2
 
 #define WINDOW_X_SIZE (UBYTE)160
@@ -43,7 +47,7 @@ enum PLAYER_DIRECTION {
 extern UBYTE temp1, temp2, temp3;
 extern UBYTE health;
 extern UBYTE hearts[];
-extern UBYTE playerXVel, playerYVel, playerVelocityLock, playerX, playerY;
+extern UBYTE playerXVel, playerYVel, playerVelocityLock, playerX, playerY, gameState;
 extern UBYTE btns, oldBtns;
 
 extern struct SPRITE sprites[6];

@@ -65,6 +65,14 @@ void update_player_velocity() {
 		increase_health(1);
 	}
 	
+	if (!(oldBtns & J_START) && btns & J_START) {
+		gameState = GAME_STATE_PAUSE;
+		// Darken the screen
+		BGP_REG = 0xf9;
+		HIDE_SPRITES;
+		return;
+	}
+	
 	temp1 = playerX + playerXVel;
 	temp2 = playerY + playerYVel;
 }
@@ -84,4 +92,12 @@ UBYTE test_sprite_collision() {
 		}
 	}
 	return 0;
+}
+
+void do_pause_actions() {
+	if (!(oldBtns & J_START) && btns & J_START) {
+		gameState = GAME_STATE_RUNNING;
+		BGP_REG = 0xe4;
+		SHOW_SPRITES;
+	}
 }

@@ -6,4 +6,5 @@ void decrease_health();
 void increase_health();
 void update_player_velocity();
 UBYTE test_sprite_collision();
+void do_pause_actions();
 #endif

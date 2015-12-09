@@ -16,7 +16,7 @@ UBYTE playerVelocityLock;
 UINT8 btns, oldBtns;
 UBYTE buffer[20];
 UBYTE temp1, temp2, temp3, temp4, temp5;
-UBYTE cycleCounter;
+UBYTE cycleCounter, no, gameState;
 UINT16 temp16, temp16b;
 // TODO: This feels clumsy... can we re-use buffer for this?
 UBYTE hearts[] = {
@@ -220,10 +220,84 @@ void update_map() NONBANKED {
 INT16 get_map_tile_base_position() NONBANKED {
 	return ((playerWorldPos / 10U) * (MAP_TILE_ROW_WIDTH*MAP_TILE_ROW_HEIGHT)) + ((playerWorldPos % 10U) * MAP_TILES_ACROSS);
 }
- 
+
+void do_game_actions() {
+	
+	SWITCH_ROM_MBC1(ROM_BANK_HELPER);
+	update_player_velocity();
+	if (!playerVelocityLock) {
+		test_sprite_collision();
+	}
+	SWITCH_ROM_MBC1(ROM_BANK_WORLD);
+	
+	if (playerXVel != 0) {
+		// Unsigned, so 0 will wrap over to > WINDOW_X_SIZE
+		if (temp1 > (PLAYER_WIDTH/2U) && temp1 < WINDOW_X_SIZE) {
+				// This could be better... both in terms of efficiency and clarity.
+				if (playerXVel == -PLAYER_MOVE_DISTANCE) { 
+					if (!test_collision(temp16b, temp1 + PLAYER_SPRITE_X_OFFSET, temp2) && !test_collision(temp16b, temp1 + PLAYER_SPRITE_X_OFFSET, temp2 + PLAYER_SPRITE_Y_HEIGHT)) {
+						playerX = temp1;
+						playerDirection = PLAYER_DIRECTION_LEFT;
+					}
+				} else { 
+					if (!test_collision(temp16b, temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2) && !test_collision(temp16b, temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2 + PLAYER_SPRITE_Y_HEIGHT)) {
+						playerX = temp1;
+						playerDirection = PLAYER_DIRECTION_RIGHT;
+					}
+				}
+		} else if (temp1 >= WINDOW_X_SIZE) {
+			playerX = PLAYER_WIDTH + PLAYER_MOVE_DISTANCE;
+			playerWorldPos++;
+			update_map();
+		} else if (temp1 <= (PLAYER_WIDTH/2U)) {
+			playerX = WINDOW_X_SIZE - PLAYER_MOVE_DISTANCE;
+			playerWorldPos--;
+			update_map();
+		}
+	}
+			
+	if (playerYVel != 0) {
+		// Unsigned, so 0 will wrap over to > WINDOW_Y_SIZE
+		if (temp2 > PLAYER_HEIGHT && temp2 < (WINDOW_Y_SIZE - STATUS_BAR_HEIGHT)) {
+				// This could be better... both in terms of efficiency and clarity.
+				if (playerYVel == -PLAYER_MOVE_DISTANCE) { 
+					if (!test_collision(temp16b, temp1 + PLAYER_SPRITE_X_OFFSET, temp2) && !test_collision(temp16b, temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2)) {
+						playerY = temp2;
+						playerDirection = PLAYER_DIRECTION_UP;
+					}
+				} else { 
+					if (!test_collision(temp16b, temp1 + PLAYER_SPRITE_X_OFFSET, temp2 + PLAYER_SPRITE_Y_HEIGHT) && !test_collision(temp16b, temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2 + PLAYER_SPRITE_Y_HEIGHT)) {
+						playerY = temp2;
+						playerDirection = PLAYER_DIRECTION_DOWN;
+					}
+				}
+		} else if (temp2 >= (WINDOW_Y_SIZE - STATUS_BAR_HEIGHT)) {
+			playerY = PLAYER_HEIGHT + PLAYER_MOVE_DISTANCE;
+			playerWorldPos += 10U;
+			update_map();
+		} else if (temp2 <= PLAYER_HEIGHT) {
+			playerY = (WINDOW_Y_SIZE - STATUS_BAR_HEIGHT) - PLAYER_MOVE_DISTANCE;
+			playerWorldPos -= 10U;
+			update_map();
+		}
+	}
+	
+	for (no=0U; no != 4U; no++) {
+		move_sprite(no, playerX + (no/2U)*8U, playerY + (no%2U)*8U);
+	}
+	
+	// Heck with it, just animate every tile.
+	SWITCH_ROM_MBC1(ROM_BANK_HELPER);
+	animate_player();
+	SWITCH_ROM_MBC1(ROM_BANK_WORLD);
+	move_sprites();
+	
+	if (playerVelocityLock)
+		playerVelocityLock--;
+}
+  
 // Here's our workhorse.
 void main(void) {
-	UBYTE no;
 		
 	// Initialize some variables
 	playerX = 64;
@@ -233,6 +307,7 @@ void main(void) {
 	playerDirection = PLAYER_DIRECTION_DOWN;
 	playerVelocityLock = 0;
 	cycleCounter = 0U;
+	gameState = GAME_STATE_TITLE;
 	 
 	for (no = 0; no != MAX_SPRITES; no++) {
 		sprites[no].x = SPRITE_OFFSCREEN_X;
@@ -244,7 +319,7 @@ void main(void) {
 	
 	SWITCH_ROM_MBC1(ROM_BANK_TITLE);
 	do_title();
-	
+	gameState = GAME_STATE_RUNNING;
 	initrand(sys_time);
 	
 	disable_interrupts();
@@ -263,81 +338,16 @@ void main(void) {
 		oldBtns = btns; // Store the old state of the buttons so we can know whether this is a first press or not.
 		btns = joypad();
 		
-		SWITCH_ROM_MBC1(ROM_BANK_HELPER);
-		update_player_velocity();
-		if (!playerVelocityLock) {
-			test_sprite_collision();
+		switch (gameState) {
+			case GAME_STATE_RUNNING:
+				do_game_actions();
+				break;
+			case GAME_STATE_PAUSE:
+				SWITCH_ROM_MBC1(ROM_BANK_HELPER);
+				do_pause_actions();
+				SWITCH_ROM_MBC1(ROM_BANK_WORLD);
+				break;
 		}
-		SWITCH_ROM_MBC1(ROM_BANK_WORLD);
-
-		
-		
-		
-		if (playerXVel != 0) {
-			// Unsigned, so 0 will wrap over to > WINDOW_X_SIZE
-			if (temp1 > (PLAYER_WIDTH/2U) && temp1 < WINDOW_X_SIZE) {
-					// This could be better... both in terms of efficiency and clarity.
-					if (playerXVel == -PLAYER_MOVE_DISTANCE) { 
-						if (!test_collision(temp16b, temp1 + PLAYER_SPRITE_X_OFFSET, temp2) && !test_collision(temp16b, temp1 + PLAYER_SPRITE_X_OFFSET, temp2 + PLAYER_SPRITE_Y_HEIGHT)) {
-							playerX = temp1;
-							playerDirection = PLAYER_DIRECTION_LEFT;
-						}
-					} else { 
-						if (!test_collision(temp16b, temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2) && !test_collision(temp16b, temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2 + PLAYER_SPRITE_Y_HEIGHT)) {
-							playerX = temp1;
-							playerDirection = PLAYER_DIRECTION_RIGHT;
-						}
-					}
-			} else if (temp1 >= WINDOW_X_SIZE) {
-				playerX = PLAYER_WIDTH + PLAYER_MOVE_DISTANCE;
-				playerWorldPos++;
-				update_map();
-			} else if (temp1 <= (PLAYER_WIDTH/2U)) {
-				playerX = WINDOW_X_SIZE - PLAYER_MOVE_DISTANCE;
-				playerWorldPos--;
-				update_map();
-			}
-		}
-				
-		if (playerYVel != 0) {
-			// Unsigned, so 0 will wrap over to > WINDOW_Y_SIZE
-			if (temp2 > PLAYER_HEIGHT && temp2 < (WINDOW_Y_SIZE - STATUS_BAR_HEIGHT)) {
-					// This could be better... both in terms of efficiency and clarity.
-					if (playerYVel == -PLAYER_MOVE_DISTANCE) { 
-						if (!test_collision(temp16b, temp1 + PLAYER_SPRITE_X_OFFSET, temp2) && !test_collision(temp16b, temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2)) {
-							playerY = temp2;
-							playerDirection = PLAYER_DIRECTION_UP;
-						}
-					} else { 
-						if (!test_collision(temp16b, temp1 + PLAYER_SPRITE_X_OFFSET, temp2 + PLAYER_SPRITE_Y_HEIGHT) && !test_collision(temp16b, temp1 + (PLAYER_SPRITE_X_OFFSET + PLAYER_SPRITE_X_WIDTH), temp2 + PLAYER_SPRITE_Y_HEIGHT)) {
-							playerY = temp2;
-							playerDirection = PLAYER_DIRECTION_DOWN;
-						}
-					}
-			} else if (temp2 >= (WINDOW_Y_SIZE - STATUS_BAR_HEIGHT)) {
-				playerY = PLAYER_HEIGHT + PLAYER_MOVE_DISTANCE;
-				playerWorldPos += 10U;
-				update_map();
-			} else if (temp2 <= PLAYER_HEIGHT) {
-				playerY = (WINDOW_Y_SIZE - STATUS_BAR_HEIGHT) - PLAYER_MOVE_DISTANCE;
-				playerWorldPos -= 10U;
-				update_map();
-			}
-		}
-		
-		for (no=0U; no != 4U; no++) {
-			move_sprite(no, playerX + (no/2U)*8U, playerY + (no%2U)*8U);
-		}
-		
-		// Heck with it, just animate every tile.
-		SWITCH_ROM_MBC1(ROM_BANK_HELPER);
-		animate_player();
-		SWITCH_ROM_MBC1(ROM_BANK_WORLD);
-		move_sprites();
-		
-		if (playerVelocityLock)
-			playerVelocityLock--;
-		
 		// I like to vblank. I like. I like to vblank. Make the game run at a sane pace.
 		wait_vbl_done();
 		cycleCounter++;
